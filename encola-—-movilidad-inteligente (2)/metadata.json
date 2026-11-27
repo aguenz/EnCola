@@ -1,6 +1,0 @@
-{
-  "name": "RutaCaracas — Movilidad Inteligente",
-  "description": "PWA de transporte público inteligente para Caracas integrando Camionetas, Metro, Metrobús y recompensas en comercios aliados.",
-  "requestFramePermissions": ["geolocation"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}
