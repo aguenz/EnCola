@@ -1,0 +1,1600 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Bus,
+  MapPin,
+  Navigation,
+  Gift,
+  Users,
+  ShieldAlert,
+  CheckCircle2,
+  Clock,
+  QrCode,
+  Phone,
+  Mail,
+  Lock,
+  ArrowRight,
+  Radio,
+  AlertTriangle,
+  WifiOff,
+  Store,
+  Award,
+  LogOut,
+  ChevronRight,
+  TrendingUp,
+  UserCheck,
+  Car,
+  X,
+  Zap,
+  Sparkles,
+  RefreshCw,
+} from 'lucide-react';
+
+declare global {
+  interface Window {
+    L: any;
+  }
+}
+
+type Role = 'passenger' | 'driver';
+type Screen = 'login' | 'main';
+type Tab = 'map' | 'route' | 'rewards';
+
+interface Stop {
+  id: string;
+  name: string;
+  shortName: string;
+  lat: number;
+  lng: number;
+  xPercent: number;
+  yPercent: number;
+  waitingCount: number;
+  zone: string;
+}
+
+interface BusUnit {
+  id: string;
+  plate: string;
+  route: string;
+  driverName: string;
+  progress: number;
+  speed: number;
+  occupancy: 'Baja' | 'Media' | 'Alta';
+  etaMinutes: number;
+  nextStopIndex: number;
+}
+
+interface Merchant {
+  id: string;
+  name: string;
+  category: string;
+  stopId: string;
+  stopName: string;
+  offer: string;
+  pointsCost: number;
+  distance: string;
+  code: string;
+}
+
+interface RoadAlert {
+  id: string;
+  type: 'traffic' | 'full' | 'detour' | 'checkpoint';
+  label: string;
+  stopName: string;
+  timeAgo: string;
+  reporter: string;
+}
+
+const STOPS: Stop[] = [
+  {
+    id: 'chacaito',
+    name: 'Estación Chacaíto (Terminal)',
+    shortName: 'Chacaíto',
+    lat: 10.4892,
+    lng: -66.8685,
+    xPercent: 10,
+    yPercent: 68,
+    waitingCount: 24,
+    zone: 'Chacaíto',
+  },
+  {
+    id: 'chacao',
+    name: 'Plaza Brión / Chacao',
+    shortName: 'Chacao',
+    lat: 10.4912,
+    lng: -66.8548,
+    xPercent: 25,
+    yPercent: 61,
+    waitingCount: 18,
+    zone: 'Chacao',
+  },
+  {
+    id: 'altamira',
+    name: 'Plaza Francia / Altamira',
+    shortName: 'Altamira',
+    lat: 10.4958,
+    lng: -66.8489,
+    xPercent: 39,
+    yPercent: 52,
+    waitingCount: 31,
+    zone: 'Altamira',
+  },
+  {
+    id: 'parque-cristal',
+    name: 'Parque Cristal / Los Palos Grandes',
+    shortName: 'P. Cristal',
+    lat: 10.4969,
+    lng: -66.8415,
+    xPercent: 53,
+    yPercent: 46,
+    waitingCount: 14,
+    zone: 'Los Palos Grandes',
+  },
+  {
+    id: 'los-cortijos',
+    name: 'Av. Principal Los Cortijos',
+    shortName: 'Los Cortijos',
+    lat: 10.4932,
+    lng: -66.8265,
+    xPercent: 68,
+    yPercent: 40,
+    waitingCount: 22,
+    zone: 'Los Cortijos',
+  },
+  {
+    id: 'la-california',
+    name: 'C.C. Líder / La California',
+    shortName: 'La California',
+    lat: 10.4885,
+    lng: -66.8172,
+    xPercent: 81,
+    yPercent: 34,
+    waitingCount: 27,
+    zone: 'La California',
+  },
+  {
+    id: 'petare',
+    name: 'Redoma de Petare (Terminal)',
+    shortName: 'Petare',
+    lat: 10.4789,
+    lng: -66.8058,
+    xPercent: 93,
+    yPercent: 26,
+    waitingCount: 39,
+    zone: 'Petare',
+  },
+];
+
+const INITIAL_BUSES: BusUnit[] = [
+  {
+    id: 'unit-01',
+    plate: 'AB-412-VE',
+    route: 'Corredor Miranda Express',
+    driverName: 'Carlos Mendoza',
+    progress: 0.22,
+    speed: 0.008,
+    occupancy: 'Media',
+    etaMinutes: 3,
+    nextStopIndex: 2,
+  },
+  {
+    id: 'unit-02',
+    plate: 'CD-889-CS',
+    route: 'Chacaíto - Petare Directo',
+    driverName: 'Luis Rodríguez',
+    progress: 0.56,
+    speed: 0.007,
+    occupancy: 'Alta',
+    etaMinutes: 6,
+    nextStopIndex: 4,
+  },
+  {
+    id: 'unit-03',
+    plate: 'EF-104-MR',
+    route: 'Corredor Miranda Express',
+    driverName: 'José Gregorio Pérez',
+    progress: 0.82,
+    speed: 0.009,
+    occupancy: 'Baja',
+    etaMinutes: 9,
+    nextStopIndex: 6,
+  },
+];
+
+const MERCHANTS: Merchant[] = [
+  {
+    id: 'm1',
+    name: 'Café El Ávila Express',
+    category: 'Cafetería',
+    stopId: 'altamira',
+    stopName: 'Plaza Francia / Altamira',
+    offer: 'Café Marrón Grande Gratis',
+    pointsCost: 80,
+    distance: '45 m de la parada',
+    code: 'AVILA-80-CCS',
+  },
+  {
+    id: 'm2',
+    name: 'Panadería La Castellana',
+    category: 'Panadería',
+    stopId: 'chacao',
+    stopName: 'Plaza Brión / Chacao',
+    offer: '2 Cachitos + Jugo (25% OFF)',
+    pointsCost: 120,
+    distance: '60 m de la parada',
+    code: 'PAN-25-CHACAO',
+  },
+  {
+    id: 'm3',
+    name: 'FarmaSalud Miranda',
+    category: 'Farmacia',
+    stopId: 'los-cortijos',
+    stopName: 'Av. Principal Los Cortijos',
+    offer: 'Bs. 80 de descuento en compra mínima',
+    pointsCost: 150,
+    distance: '30 m de la parada',
+    code: 'FARMA-150-VE',
+  },
+  {
+    id: 'm4',
+    name: 'Arepera El Terminal',
+    category: 'Comida Rápida',
+    stopId: 'petare',
+    stopName: 'Redoma de Petare',
+    offer: 'Arepa Reina Pepiada 2x1',
+    pointsCost: 200,
+    distance: '20 m de la parada',
+    code: 'AREPA-2X1-PET',
+  },
+];
+
+function interpolatePosition(progress: number) {
+  const scaled = progress * (STOPS.length - 1);
+  const idx = Math.min(Math.floor(scaled), STOPS.length - 2);
+  const t = scaled - idx;
+  const s1 = STOPS[idx];
+  const s2 = STOPS[idx + 1];
+  return {
+    lat: s1.lat + (s2.lat - s1.lat) * t,
+    lng: s1.lng + (s2.lng - s1.lng) * t,
+    xPercent: s1.xPercent + (s2.xPercent - s1.xPercent) * t,
+    yPercent: s1.yPercent + (s2.yPercent - s1.yPercent) * t,
+    nextStopIndex: idx + 1,
+  };
+}
+
+export default function App() {
+  // Navigation & Auth State
+  const [screen, setScreen] = useState<Screen>('login');
+  const [role, setRole] = useState<Role>('passenger');
+  const [activeTab, setActiveTab] = useState<Tab>('map');
+
+  // Login Form State (No Google OAuth)
+  const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone');
+  const [phoneInput, setPhoneInput] = useState('0414-555-8921');
+  const [emailInput, setEmailInput] = useState('usuario@rutavia.ve');
+  const [passwordInput, setPasswordInput] = useState('••••••••');
+  const [userName, setUserName] = useState('Andrés Silva');
+
+  // Interactive Map & Transit Simulation State
+  const [stops, setStops] = useState<Stop[]>(STOPS);
+  const [selectedStopId, setSelectedStopId] = useState<string>('altamira');
+  const [buses, setBuses] = useState<BusUnit[]>(INITIAL_BUSES);
+  const [leafletReady, setLeafletReady] = useState(false);
+  const [mapFailed, setMapFailed] = useState(false);
+
+  // Passenger Gamification & Proof-of-Transit State
+  const [points, setPoints] = useState<number>(145);
+  const [isOnBoard, setIsOnBoard] = useState<boolean>(false);
+  const [validatedBusPlate, setValidatedBusPlate] = useState<string | null>(null);
+  const [redeemedMerchant, setRedeemedMerchant] = useState<Merchant | null>(null);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Driver Operational State
+  const [driverOnline, setDriverOnline] = useState<boolean>(true);
+  const [driverCurrentStopIdx, setDriverCurrentStopIdx] = useState<number>(1);
+  const [driverValidatedCount, setDriverValidatedCount] = useState<number>(28);
+  const [alerts, setAlerts] = useState<RoadAlert[]>([
+    {
+      id: 'a1',
+      type: 'traffic',
+      label: 'Tráfico lento altura Distribuidor Altamira',
+      stopName: 'Altamira',
+      timeAgo: 'Hace 4 min',
+      reporter: 'Unidad AB-412-VE',
+    },
+  ]);
+
+  // Leaflet Refs
+  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markersLayerRef = useRef<any>(null);
+
+  const triggerToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((prev) => (prev === msg ? null : prev));
+    }, 3400);
+  };
+
+  // Switch role cleanly (reset rewards tab if switching to driver)
+  const handleRoleSwitch = (newRole: Role) => {
+    setRole(newRole);
+    if (newRole === 'driver' && activeTab === 'rewards') {
+      setActiveTab('route');
+    }
+    triggerToast(
+      newRole === 'passenger'
+        ? 'Modo Pasajero activo: acumula puntos viajando'
+        : 'Modo Conductor activo: panel operativo sin distracciones'
+    );
+  };
+
+  // Load Leaflet CSS & JS dynamically for real map rendering
+  useEffect(() => {
+    if (window.L) {
+      setLeafletReady(true);
+      return;
+    }
+
+    const cssId = 'leaflet-css-cdn';
+    if (!document.getElementById(cssId)) {
+      const link = document.createElement('link');
+      link.id = cssId;
+      link.rel = 'stylesheet';
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+      document.head.appendChild(link);
+    }
+
+    const scriptId = 'leaflet-js-cdn';
+    if (!document.getElementById(scriptId)) {
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+      script.async = true;
+      script.onload = () => setLeafletReady(true);
+      script.onerror = () => setMapFailed(true);
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  // Animate buses along Av. Francisco de Miranda
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setBuses((prevBuses) =>
+        prevBuses.map((bus) => {
+          let nextProg = bus.progress + bus.speed;
+          if (nextProg >= 1) nextProg = 0.02;
+          const pos = interpolatePosition(nextProg);
+          const distSteps = Math.max(1, pos.nextStopIndex);
+          return {
+            ...bus,
+            progress: nextProg,
+            nextStopIndex: pos.nextStopIndex,
+            etaMinutes: Math.max(1, Math.round((1 - (nextProg % 0.16) / 0.16) * 5)),
+          };
+        })
+      );
+    }, 1500);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Initialize Leaflet Map when on Main Screen + Map Tab
+  useEffect(() => {
+    if (screen !== 'main' || activeTab !== 'map' || !leafletReady || mapFailed) return;
+    if (!mapContainerRef.current || !window.L) return;
+
+    if (!mapInstanceRef.current) {
+      try {
+        const L = window.L;
+        const map = L.map(mapContainerRef.current, {
+          center: [10.4918, -66.842],
+          zoom: 13,
+          zoomControl: false,
+          attributionControl: false,
+        });
+
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          maxZoom: 18,
+        }).addTo(map);
+
+        // Draw corridor polyline
+        const latlngs = STOPS.map((s) => [s.lat, s.lng]);
+        L.polyline(latlngs, {
+          color: '#10b981',
+          weight: 5,
+          opacity: 0.75,
+        }).addTo(map);
+
+        markersLayerRef.current = L.layerGroup().addTo(map);
+        mapInstanceRef.current = map;
+      } catch (err) {
+        setMapFailed(true);
+      }
+    }
+
+    setTimeout(() => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.invalidateSize();
+      }
+    }, 120);
+
+    return () => {
+      if (mapInstanceRef.current && activeTab !== 'map') {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markersLayerRef.current = null;
+      }
+    };
+  }, [screen, activeTab, leafletReady, mapFailed]);
+
+  // Update markers on Leaflet map whenever buses, stops, or role change
+  useEffect(() => {
+    if (!mapInstanceRef.current || !markersLayerRef.current || !window.L) return;
+    const L = window.L;
+    const layer = markersLayerRef.current;
+    layer.clearLayers();
+
+    // Render Stops (Differentiated by Role: Driver sees waiting count, Passenger sees merchants indicator)
+    stops.forEach((stop) => {
+      const isSelected = stop.id === selectedStopId;
+      const hasMerchant = MERCHANTS.some((m) => m.stopId === stop.id);
+
+      const badgeHtml =
+        role === 'driver'
+          ? `<span style="background:#f59e0b;color:#09090b;font-weight:800;font-size:10px;padding:1px 5px;border-radius:999px;margin-left:4px;">${stop.waitingCount}p</span>`
+          : hasMerchant
+          ? `<span style="color:#fbbf24;font-size:11px;margin-left:3px;">★</span>`
+          : '';
+
+      const icon = L.divIcon({
+        className: 'custom-stop-marker',
+        html: `
+          <div style="display:flex;align-items:center;white-space:nowrap;transform:translate(-12px,-12px);">
+            <div style="width:16px;height:16px;border-radius:999px;background:${
+              isSelected ? '#10b981' : '#18181b'
+            };border:3px solid ${
+          isSelected ? '#ecfdf5' : '#10b981'
+        };box-shadow:0 0 12px rgba(16,185,129,0.6);"></div>
+            <div style="margin-left:6px;background:rgba(9,9,11,0.9);border:1px solid ${
+              isSelected ? '#10b981' : '#27272a'
+            };color:#f4f4f5;font-size:11px;font-weight:600;padding:2px 7px;border-radius:8px;box-shadow:0 4px 10px rgba(0,0,0,0.5);">
+              ${stop.shortName}${badgeHtml}
+            </div>
+          </div>
+        `,
+        iconSize: [24, 24],
+      });
+
+      const marker = L.marker([stop.lat, stop.lng], { icon }).addTo(layer);
+      marker.on('click', () => {
+        setSelectedStopId(stop.id);
+      });
+    });
+
+    // Render Moving Buses
+    buses.forEach((bus) => {
+      const pos = interpolatePosition(bus.progress);
+      const busIcon = L.divIcon({
+        className: 'custom-bus-marker',
+        html: `
+          <div style="transform:translate(-14px,-14px);display:flex;flex-direction:column;align-items:center;">
+            <div style="background:#0ea5e9;color:#fff;width:28px;height:28px;border-radius:999px;display:flex;align-items:center;justify-content:center;border:2px solid #e0f2fe;box-shadow:0 0 14px rgba(14,165,233,0.85);font-size:13px;">
+              🚌
+            </div>
+            <span style="margin-top:2px;background:#0284c7;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;">
+              ${bus.plate.split('-')[0]}
+            </span>
+          </div>
+        `,
+        iconSize: [28, 28],
+      });
+      L.marker([pos.lat, pos.lng], { icon: busIcon }).addTo(layer);
+    });
+  }, [stops, buses, selectedStopId, role, activeTab, screen]);
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setScreen('main');
+    triggerToast(
+      role === 'passenger'
+        ? '¡Bienvenido! Explora rutas en Av. Francisco de Miranda'
+        : 'Turno iniciado. GPS transmitiendo en Corredor Miranda'
+    );
+  };
+
+  const handleQuickDemoLogin = (demoRole: Role) => {
+    setRole(demoRole);
+    setUserName(demoRole === 'passenger' ? 'Andrés Silva' : 'Carlos Mendoza');
+    setActiveTab('map');
+    setScreen('main');
+    triggerToast(
+      demoRole === 'passenger'
+        ? 'Acceso Demo Pasajero listo'
+        : 'Acceso Demo Conductor listo'
+    );
+  };
+
+  // Passenger: Proof-of-Transit Validation
+  const handleValidateBoarding = (bus: BusUnit) => {
+    if (isOnBoard && validatedBusPlate === bus.plate) {
+      setIsOnBoard(false);
+      setValidatedBusPlate(null);
+      triggerToast('Viaje finalizado. ¡Gracias por reportar!');
+      return;
+    }
+
+    setIsOnBoard(true);
+    setValidatedBusPlate(bus.plate);
+    setPoints((prev) => prev + 25);
+    setDriverValidatedCount((prev) => prev + 1);
+    triggerToast(`+25 Pts acreditados por validar abordaje en ${bus.plate}`);
+  };
+
+  // Passenger: Redeem Merchant Coupon
+  const handleRedeemMerchant = (merchant: Merchant) => {
+    if (points < merchant.pointsCost) {
+      triggerToast(`Te faltan ${merchant.pointsCost - points} pts para este canje`);
+      return;
+    }
+    setPoints((prev) => prev - merchant.pointsCost);
+    setRedeemedMerchant(merchant);
+  };
+
+  // Driver: Quick 1-Tap Operational Alert
+  const handleDriverAlert = (
+    type: RoadAlert['type'],
+    label: string
+  ) => {
+    const currentStop = stops[driverCurrentStopIdx] || stops[0];
+    const newAlert: RoadAlert = {
+      id: Date.now().toString(),
+      type,
+      label,
+      stopName: currentStop.shortName,
+      timeAgo: 'Ahora',
+      reporter: 'Tu Unidad (AB-412-VE)',
+    };
+    setAlerts((prev) => [newAlert, ...prev.slice(0, 3)]);
+    triggerToast(`Alerta enviada: ${label}`);
+  };
+
+  // Driver: Advance to next stop
+  const handleAdvanceStop = () => {
+    const nextIdx = (driverCurrentStopIdx + 1) % stops.length;
+    setDriverCurrentStopIdx(nextIdx);
+    const boarded = Math.min(stops[nextIdx].waitingCount, 6);
+    setDriverValidatedCount((prev) => prev + boarded);
+    setStops((prev) =>
+      prev.map((s, idx) =>
+        idx === nextIdx
+          ? { ...s, waitingCount: Math.max(3, s.waitingCount - boarded) }
+          : s
+      )
+    );
+    triggerToast(`Llegada registrada en ${stops[nextIdx].shortName} (+${boarded} pasajeros)`);
+  };
+
+  const selectedStop = stops.find((s) => s.id === selectedStopId) || stops[2];
+  const nearbyMerchants = MERCHANTS.filter((m) => m.stopId === selectedStop.id);
+
+  // Driver upcoming 3 stops
+  const driverNextStops = [1, 2, 3].map(
+    (offset) => stops[(driverCurrentStopIdx + offset) % stops.length]
+  );
+  const totalUpcomingDemand = driverNextStops.reduce(
+    (acc, s) => acc + s.waitingCount,
+    0
+  );
+
+  // ============================================================================
+  // SCREEN 1: LOGIN (NO GOOGLE OAUTH REQUIRED)
+  // ============================================================================
+  if (screen === 'login') {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex justify-center selection:bg-emerald-500/30">
+        <div className="w-full max-w-md min-h-screen bg-zinc-950 border-x border-zinc-900 flex flex-col justify-between p-6 relative overflow-hidden">
+          {/* Ambient Glow */}
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-10 -left-24 w-64 h-64 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+
+          {/* Header Branding */}
+          <div className="pt-4 relative z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold mb-4">
+              <Radio className="w-3.5 h-3.5 animate-pulse" />
+              Piloto Caracas • Av. Francisco de Miranda
+            </div>
+
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                <Bus className="w-7 h-7 text-zinc-950 stroke-[2.2]" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-extrabold tracking-tight text-white">
+                  RutaVía <span className="text-emerald-400">CCS</span>
+                </h1>
+                <p className="text-xs text-zinc-400">
+                  Movilidad colaborativa y tránsito inteligente
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Auth Card */}
+          <div className="my-6 relative z-10">
+            <div className="bg-zinc-900/90 border border-zinc-800 rounded-3xl p-5 shadow-2xl backdrop-blur">
+              <h2 className="text-base font-bold text-white mb-1">
+                Ingresa sin cuenta Google
+              </h2>
+              <p className="text-xs text-zinc-400 mb-4">
+                Acceso directo con línea móvil venezolana o correo electrónico.
+              </p>
+
+              {/* Role Selector before Login */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-zinc-950 rounded-xl border border-zinc-800 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setRole('passenger')}
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                    role === 'passenger'
+                      ? 'bg-emerald-500 text-zinc-950 shadow-md'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <Users className="w-4 h-4" />
+                  Soy Pasajero
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRole('driver')}
+                  className={`flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                    role === 'driver'
+                      ? 'bg-amber-400 text-zinc-950 shadow-md'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  <Car className="w-4 h-4" />
+                  Soy Conductor
+                </button>
+              </div>
+
+              {/* Auth Method Toggle */}
+              <div className="flex gap-4 border-b border-zinc-800 mb-4 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setAuthMethod('phone')}
+                  className={`pb-2 transition-colors border-b-2 ${
+                    authMethod === 'phone'
+                      ? 'border-emerald-400 text-emerald-400'
+                      : 'border-transparent text-zinc-500'
+                  }`}
+                >
+                  Teléfono (+58)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMethod('email')}
+                  className={`pb-2 transition-colors border-b-2 ${
+                    authMethod === 'email'
+                      ? 'border-emerald-400 text-emerald-400'
+                      : 'border-transparent text-zinc-500'
+                  }`}
+                >
+                  Correo Electrónico
+                </button>
+              </div>
+
+              <form onSubmit={handleLoginSubmit} className="space-y-3">
+                {authMethod === 'phone' ? (
+                  <div>
+                    <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+                      Número celular
+                    </label>
+                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 focus-within:border-emerald-500">
+                      <Phone className="w-4 h-4 text-zinc-500 mr-2" />
+                      <span className="text-xs font-bold text-emerald-400 mr-2">
+                        +58
+                      </span>
+                      <input
+                        type="text"
+                        value={phoneInput}
+                        onChange={(e) => setPhoneInput(e.target.value)}
+                        className="bg-transparent text-sm text-white w-full focus:outline-none"
+                        placeholder="0414-000-0000"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+                      Correo electrónico
+                    </label>
+                    <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 focus-within:border-emerald-500">
+                      <Mail className="w-4 h-4 text-zinc-500 mr-2" />
+                      <input
+                        type="email"
+                        value={emailInput}
+                        onChange={(e) => setEmailInput(e.target.value)}
+                        className="bg-transparent text-sm text-white w-full focus:outline-none"
+                        placeholder="nombre@dominio.com"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-[11px] font-medium text-zinc-400 mb-1">
+                    Clave o PIN de 6 dígitos
+                  </label>
+                  <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 focus-within:border-emerald-500">
+                    <Lock className="w-4 h-4 text-zinc-500 mr-2" />
+                    <input
+                      type="password"
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      className="bg-transparent text-sm text-white w-full focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className={`w-full py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg ${
+                    role === 'passenger'
+                      ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-emerald-500/20'
+                      : 'bg-amber-400 hover:bg-amber-300 text-zinc-950 shadow-amber-400/20'
+                  }`}
+                >
+                  Entrar como {role === 'passenger' ? 'Pasajero' : 'Conductor'}
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </form>
+            </div>
+
+            {/* Instant 1-Tap Demo Access */}
+            <div className="mt-4">
+              <p className="text-center text-[11px] text-zinc-500 mb-2">
+                Acceso rápido de demostración (1 toque)
+              </p>
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => handleQuickDemoLogin('passenger')}
+                  className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-2xl p-3 text-left transition-all group"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-emerald-400">
+                      Demo Pasajero
+                    </span>
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-400 group-hover:scale-110 transition-transform" />
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-tight">
+                    Ver mapa, validar viaje y canjear puntos
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleQuickDemoLogin('driver')}
+                  className="bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 rounded-2xl p-3 text-left transition-all group"
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold text-amber-400">
+                      Demo Conductor
+                    </span>
+                    <Bus className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
+                  </div>
+                  <p className="text-[11px] text-zinc-400 leading-tight">
+                    Demanda en paradas y alertas de ruta
+                  </p>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Offline-ready footer note */}
+          <div className="text-center text-[11px] text-zinc-500 flex items-center justify-center gap-1.5 pb-2">
+            <Zap className="w-3.5 h-3.5 text-emerald-400" />
+            Modo ligero optimizado para datos móviles en Venezuela
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // SCREEN 2: MAIN APP (PASSENGER & DRIVER VIEWS)
+  // ============================================================================
+  return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex justify-center">
+      <div className="w-full max-w-md min-h-screen bg-zinc-950 border-x border-zinc-900 flex flex-col relative pb-20">
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 w-[90%] max-w-sm bg-zinc-900/95 border border-emerald-500/50 text-white px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-medium backdrop-blur-md">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{toastMessage}</span>
+          </div>
+        )}
+
+        {/* Top Bar with Live Role Switcher */}
+        <header className="sticky top-0 z-30 bg-zinc-950/90 backdrop-blur-md border-b border-zinc-900 px-4 py-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                  role === 'passenger'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-amber-400/20 text-amber-400 border border-amber-400/30'
+                }`}
+              >
+                <Bus className="w-4 h-4" />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-extrabold tracking-tight text-white">
+                    RutaVía
+                  </span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-400 border border-zinc-800">
+                    Miranda
+                  </span>
+                </div>
+                <p className="text-[10px] text-zinc-400">
+                  {role === 'passenger'
+                    ? `${userName} • ${points} Pts`
+                    : 'Unidad AB-412-VE • En Servicio'}
+                </p>
+              </div>
+            </div>
+
+            {/* Role Toggle Pill */}
+            <div className="flex items-center gap-1.5">
+              <div className="bg-zinc-900 p-0.5 rounded-xl border border-zinc-800 flex text-[11px] font-bold">
+                <button
+                  onClick={() => handleRoleSwitch('passenger')}
+                  className={`px-2.5 py-1 rounded-lg transition-all ${
+                    role === 'passenger'
+                      ? 'bg-emerald-500 text-zinc-950'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Pasajero
+                </button>
+                <button
+                  onClick={() => handleRoleSwitch('driver')}
+                  className={`px-2.5 py-1 rounded-lg transition-all ${
+                    role === 'driver'
+                      ? 'bg-amber-400 text-zinc-950'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Conductor
+                </button>
+              </div>
+
+              <button
+                onClick={() => setScreen('login')}
+                title="Cerrar sesión"
+                className="p-2 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* ==================================================================== */}
+        {/* TAB 1: MAPA EN VIVO (SHARED CORRIDOR WITH ROLE-SPECIFIC OVERLAYS)    */}
+        {/* ==================================================================== */}
+        {activeTab === 'map' && (
+          <div className="flex-1 flex flex-col">
+            {/* Map Viewport */}
+            <div className="relative h-72 w-full bg-zinc-900 border-b border-zinc-800 overflow-hidden">
+              {!mapFailed ? (
+                <div ref={mapContainerRef} className="w-full h-full z-10" />
+              ) : null}
+
+              {/* SVG Schematic Fallback if Leaflet offline/blocked */}
+              {mapFailed && (
+                <div className="w-full h-full bg-zinc-900 p-4 flex flex-col justify-between relative">
+                  <div className="flex items-center justify-between text-[11px] text-zinc-400">
+                    <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                      <WifiOff className="w-3.5 h-3.5" /> Mapa Esquema Offline
+                    </span>
+                    <span>Av. Francisco de Miranda</span>
+                  </div>
+
+                  <svg viewBox="0 0 100 100" className="w-full h-48 overflow-visible">
+                    <polyline
+                      fill="none"
+                      stroke="#10b981"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      points={stops.map((s) => `${s.xPercent},${s.yPercent}`).join(' ')}
+                    />
+                    {stops.map((stop) => {
+                      const active = stop.id === selectedStopId;
+                      return (
+                        <g
+                          key={stop.id}
+                          onClick={() => setSelectedStopId(stop.id)}
+                          className="cursor-pointer"
+                        >
+                          <circle
+                            cx={stop.xPercent}
+                            cy={stop.yPercent}
+                            r={active ? 3.8 : 2.6}
+                            fill={active ? '#10b981' : '#18181b'}
+                            stroke="#10b981"
+                            strokeWidth="1.2"
+                          />
+                          <text
+                            x={stop.xPercent}
+                            y={stop.yPercent - 5}
+                            textAnchor="middle"
+                            fill="#e4e4e7"
+                            fontSize="3.3"
+                            fontWeight="bold"
+                          >
+                            {stop.shortName}
+                            {role === 'driver' ? ` (${stop.waitingCount}p)` : ''}
+                          </text>
+                        </g>
+                      );
+                    })}
+                    {buses.map((bus) => {
+                      const pos = interpolatePosition(bus.progress);
+                      return (
+                        <circle
+                          key={bus.id}
+                          cx={pos.xPercent}
+                          cy={pos.yPercent}
+                          r="3"
+                          fill="#0ea5e9"
+                          stroke="#fff"
+                          strokeWidth="1"
+                        />
+                      );
+                    })}
+                  </svg>
+                </div>
+              )}
+
+              {/* Floating Corridor Status Pill */}
+              <div className="absolute top-3 left-3 z-20 bg-zinc-950/90 border border-zinc-800 px-3 py-1.5 rounded-full flex items-center gap-2 text-[11px] backdrop-blur">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className="font-semibold text-zinc-200">
+                  {buses.length} unidades activas
+                </span>
+              </div>
+
+              {/* Passenger Points Pill OR Driver GPS Status Pill */}
+              {role === 'passenger' ? (
+                <button
+                  onClick={() => setActiveTab('rewards')}
+                  className="absolute top-3 right-3 z-20 bg-zinc-950/90 border border-amber-400/40 px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-bold text-amber-300 backdrop-blur"
+                >
+                  <Gift className="w-3.5 h-3.5 text-amber-400" />
+                  {points} Pts
+                </button>
+              ) : (
+                <button
+                  onClick={() => setDriverOnline(!driverOnline)}
+                  className={`absolute top-3 right-3 z-20 px-3 py-1.5 rounded-full flex items-center gap-1.5 text-[11px] font-bold border backdrop-blur ${
+                    driverOnline
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                      : 'bg-red-500/20 border-red-500/50 text-red-300'
+                  }`}
+                >
+                  <Radio className="w-3.5 h-3.5" />
+                  {driverOnline ? 'GPS En Ruta' : 'GPS Pausado'}
+                </button>
+              )}
+            </div>
+
+            {/* Horizontal Stop Selector */}
+            <div className="px-4 py-3 border-b border-zinc-900 bg-zinc-950">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+                  Paradas del Corredor
+                </span>
+                <span className="text-[11px] text-emerald-400 font-medium">
+                  Toca una parada
+                </span>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {stops.map((stop) => {
+                  const isSelected = stop.id === selectedStop.id;
+                  return (
+                    <button
+                      key={stop.id}
+                      onClick={() => setSelectedStopId(stop.id)}
+                      className={`shrink-0 px-3 py-2 rounded-xl border text-left transition-all ${
+                        isSelected
+                          ? 'bg-emerald-500/15 border-emerald-500 text-white'
+                          : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="text-xs font-bold">{stop.shortName}</div>
+                      <div className="text-[10px] opacity-80 flex items-center gap-1 mt-0.5">
+                        <Users className="w-3 h-3" />
+                        {stop.waitingCount} esperando
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Contextual Bottom Panel: PASSENGER vs DRIVER */}
+            <div className="p-4 space-y-4">
+              {role === 'passenger' ? (
+                <>
+                  {/* Selected Stop Card for Passenger */}
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+                    <div className="flex items-start justify-between gap-2 mb-3">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                          Parada Seleccionada
+                        </span>
+                        <h3 className="text-base font-bold text-white">
+                          {selectedStop.name}
+                        </h3>
+                      </div>
+                      <div className="bg-zinc-950 border border-zinc-800 px-2.5 py-1 rounded-lg text-right">
+                        <span className="block text-xs font-bold text-white">
+                          {selectedStop.waitingCount}
+                        </span>
+                        <span className="text-[10px] text-zinc-400">en cola</span>
+                      </div>
+                    </div>
+
+                    {/* Approaching Buses */}
+                    <div className="space-y-2.5">
+                      {buses.slice(0, 2).map((bus) => {
+                        const isThisBusValidated =
+                          isOnBoard && validatedBusPlate === bus.plate;
+                        return (
+                          <div
+                            key={bus.id}
+                            className="bg-zinc-950 border border-zinc-800/90 rounded-xl p-3 flex items-center justify-between gap-2"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex flex-col items-center justify-center text-sky-400">
+                                <span className="text-xs font-extrabold leading-none">
+                                  {bus.etaMinutes}
+                                </span>
+                                <span className="text-[9px] uppercase">min</span>
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold text-white">
+                                    {bus.plate}
+                                  </span>
+                                  <span
+                                    className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                                      bus.occupancy === 'Baja'
+                                        ? 'bg-emerald-500/20 text-emerald-400'
+                                        : bus.occupancy === 'Media'
+                                        ? 'bg-amber-400/20 text-amber-300'
+                                        : 'bg-rose-500/20 text-rose-400'
+                                    }`}
+                                  >
+                                    Ocupación {bus.occupancy}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-zinc-400">
+                                  {bus.route}
+                                </p>
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => handleValidateBoarding(bus)}
+                              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                                isThisBusValidated
+                                  ? 'bg-emerald-500 text-zinc-950'
+                                  : 'bg-zinc-800 hover:bg-emerald-500 hover:text-zinc-950 text-emerald-400'
+                              }`}
+                            >
+                              {isThisBusValidated ? 'A Bordo ✓' : '+25 Pts'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Nearby Merchant Teaser for Passenger */}
+                  {nearbyMerchants.length > 0 && (
+                    <div className="bg-gradient-to-r from-amber-500/15 to-emerald-500/10 border border-amber-400/30 rounded-2xl p-3.5 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-400/20 flex items-center justify-center text-amber-300 shrink-0">
+                          <Store className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="text-[10px] font-bold uppercase text-amber-300">
+                            Comercio Aliado en esta parada
+                          </span>
+                          <p className="text-xs font-bold text-white">
+                            {nearbyMerchants[0].name}
+                          </p>
+                          <p className="text-[11px] text-zinc-300">
+                            {nearbyMerchants[0].offer} (
+                            {nearbyMerchants[0].pointsCost} pts)
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setActiveTab('rewards')}
+                        className="p-2 rounded-xl bg-amber-400 text-zinc-950 font-bold shrink-0"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                /* DRIVER VIEW ON MAP TAB: STRICTLY OPERATIONAL (NO MERCHANTS) */
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                        Despacho Operativo en Vivo
+                      </span>
+                      <h3 className="text-base font-bold text-white">
+                        Próximas 3 Paradas: {totalUpcomingDemand} pasajeros
+                      </h3>
+                    </div>
+                    <button
+                      onClick={handleAdvanceStop}
+                      className="px-3 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 text-xs font-extrabold flex items-center gap-1.5"
+                    >
+                      <Navigation className="w-3.5 h-3.5" />
+                      Siguiente Parada
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {driverNextStops.map((st, idx) => (
+                      <div
+                        key={st.id}
+                        className="bg-zinc-950 border border-zinc-800 rounded-xl p-2.5"
+                      >
+                        <span className="text-[10px] text-zinc-500 font-semibold">
+                          Parada +{idx + 1}
+                        </span>
+                        <p className="text-xs font-bold text-white truncate">
+                          {st.shortName}
+                        </p>
+                        <div className="mt-1 flex items-center gap-1 text-amber-400 text-xs font-extrabold">
+                          <Users className="w-3.5 h-3.5" />
+                          {st.waitingCount} pers.
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ==================================================================== */}
+        {/* TAB 2: RUTA / OPERACIÓN (PASSENGER ETA vs DRIVER DISPATCH & ALERTS)  */}
+        {/* ==================================================================== */}
+        {activeTab === 'route' && (
+          <div className="p-4 space-y-4">
+            {role === 'passenger' ? (
+              <>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+                  <h2 className="text-base font-bold text-white mb-1">
+                    Unidades en el Corredor Miranda
+                  </h2>
+                  <p className="text-xs text-zinc-400 mb-4">
+                    Valida tu viaje al subir para ayudar a otros pasajeros y ganar{' '}
+                    <span className="text-emerald-400 font-bold">+25 puntos</span>.
+                  </p>
+
+                  <div className="space-y-3">
+                    {buses.map((bus) => {
+                      const nextStop = stops[bus.nextStopIndex] || stops[0];
+                      const active = isOnBoard && validatedBusPlate === bus.plate;
+                      return (
+                        <div
+                          key={bus.id}
+                          className={`rounded-2xl p-3.5 border transition-all ${
+                            active
+                              ? 'bg-emerald-500/10 border-emerald-500'
+                              : 'bg-zinc-950 border-zinc-800'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded bg-sky-500/20 text-sky-400 text-xs font-extrabold">
+                                {bus.plate}
+                              </span>
+                              <span className="text-xs font-semibold text-zinc-300">
+                                {bus.route}
+                              </span>
+                            </div>
+                            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1">
+                              <Clock className="w-3.5 h-3.5" />
+                              {bus.etaMinutes} min
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-3">
+                            <span>Próxima: {nextStop.shortName}</span>
+                            <span>Conductor: {bus.driverName}</span>
+                          </div>
+
+                          <button
+                            onClick={() => handleValidateBoarding(bus)}
+                            className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                              active
+                                ? 'bg-emerald-500 text-zinc-950'
+                                : 'bg-zinc-900 hover:bg-emerald-500 hover:text-zinc-950 text-emerald-400 border border-emerald-500/30'
+                            }`}
+                          >
+                            <UserCheck className="w-4 h-4" />
+                            {active
+                              ? 'Viaje Validado • Compartiendo ubicación'
+                              : 'Estoy a bordo (+25 Pts)'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Live Community Road Alerts */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">
+                    Alertas Viales en Tiempo Real
+                  </h3>
+                  <div className="space-y-2">
+                    {alerts.map((al) => (
+                      <div
+                        key={al.id}
+                        className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex items-start gap-2.5"
+                      >
+                        <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-xs font-semibold text-white">
+                            {al.label}
+                          </p>
+                          <p className="text-[10px] text-zinc-500">
+                            {al.stopName} • {al.timeAgo} ({al.reporter})
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            ) : (
+              /* DRIVER OPERATIONAL CONSOLE (NO MERCHANTS) */
+              <>
+                {/* Driver Shift Summary */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3.5">
+                    <span className="text-[11px] text-zinc-400 flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-amber-400" />
+                      Pasajeros Hoy
+                    </span>
+                    <p className="text-2xl font-extrabold text-white mt-1">
+                      {driverValidatedCount}
+                    </p>
+                    <span className="text-[10px] text-emerald-400">
+                      Est. Bs. {(driverValidatedCount * 20).toLocaleString('es-VE')}
+                    </span>
+                  </div>
+
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3.5">
+                    <span className="text-[11px] text-zinc-400 flex items-center gap-1">
+                      <TrendingUp className="w-3.5 h-3.5 text-sky-400" />
+                      Demanda Adelante
+                    </span>
+                    <p className="text-2xl font-extrabold text-amber-400 mt-1">
+                      {totalUpcomingDemand}
+                    </p>
+                    <span className="text-[10px] text-zinc-400">
+                      en próximas 3 paradas
+                    </span>
+                  </div>
+                </div>
+
+                {/* Current Stop & Advance Control */}
+                <div className="bg-zinc-900 border border-amber-400/30 rounded-2xl p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase text-amber-400">
+                        Ubicación Actual de Unidad
+                      </span>
+                      <h3 className="text-base font-bold text-white">
+                        {stops[driverCurrentStopIdx].name}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={handleAdvanceStop}
+                      className="px-3.5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 text-xs font-extrabold flex items-center gap-1.5 shadow-lg shadow-amber-400/20"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      Avanzar Parada
+                    </button>
+                  </div>
+
+                  <div className="space-y-2 mt-3">
+                    {driverNextStops.map((st, index) => (
+                      <div
+                        key={st.id}
+                        className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2.5 flex items-center justify-between"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-6 h-6 rounded-lg bg-zinc-900 border border-zinc-700 flex items-center justify-center text-xs font-bold text-amber-400">
+                            {index + 1}
+                          </span>
+                          <div>
+                            <p className="text-xs font-bold text-white">
+                              {st.name}
+                            </p>
+                            <p className="text-[10px] text-zinc-500">
+                              ETA aprox. {(index + 1) * 3} min
+                            </p>
+                          </div>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-lg bg-amber-400/15 text-amber-300 text-xs font-extrabold">
+                          {st.waitingCount} esperando
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 1-Tap Driver Road Alerts */}
+                <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">
+                    Reportes Rápidos de Ruta (1 Toque)
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      onClick={() =>
+                        handleDriverAlert('traffic', 'Tráfico fuerte en el canal')
+                      }
+                      className="p-3 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-left flex items-center gap-2.5"
+                    >
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span className="text-xs font-bold text-zinc-200">
+                        Tráfico Fuerte
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        handleDriverAlert('full', 'Unidad llena (sin puestos)')
+                      }
+                      className="p-3 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-left flex items-center gap-2.5"
+                    >
+                      <Users className="w-4 h-4 text-rose-400 shrink-0" />
+                      <span className="text-xs font-bold text-zinc-200">
+                        Unidad Llena
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        handleDriverAlert('detour', 'Desvío activo en vía')
+                      }
+                      className="p-3 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-left flex items-center gap-2.5"
+                    >
+                      <Navigation className="w-4 h-4 text-sky-400 shrink-0" />
+                      <span className="text-xs font-bold text-zinc-200">
+                        Desvío en Vía
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() =>
+                        handleDriverAlert('checkpoint', 'Alcabala / Control vial')
+                      }
+                      className="p-3 rounded-xl bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-left flex items-center gap-2.5"
+                    >
+                      <ShieldAlert className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span className="text-xs font-bold text-zinc-200">
+                        Alcabala / Control
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ==================================================================== */}
+        {/* TAB 3: COMERCIOS Y CANJES (EXCLUSIVELY FOR PASSENGERS)                */}
+        {/* ==================================================================== */}
+        {activeTab === 'rewards' && role === 'passenger' && (
+          <div className="p-4 space-y-4">
+            {/* Points Balance Banner */}
+            <div className="bg-gradient-to-br from-emerald-500/20 via-zinc-900 to-amber-500/15 border border-emerald-500/30 rounded-2xl p-4 flex items-center justify-between">
+              <div>
+                <span className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider">
+                  Saldo Disponible
+                </span>
+                <div className="flex items-baseline gap-1.5 mt-0.5">
+                  <span className="text-3xl font-black text-white">{points}</span>
+                  <span className="text-xs font-bold text-amber-400">Pts RutaVía</span>
+                </div>
+                <p className="text-[11px] text-zinc-400 mt-1">
+                  Ganas +25 pts cada vez que validas tu viaje a bordo
+                </p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-amber-400/20 border border-amber-400/40 flex items-center justify-center text-amber-300">
+                <Award className="w-6 h-6" />
+              </div>
+            </div>
+
+            {/* Merchant Catalog */}
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-3">
+                Comercios Aliados Cerca de Paradas
+              </h3>
+              <div className="space-y-3">
+                {MERCHANTS.map((merchant) => {
+                  const canAfford = points >= merchant.pointsCost;
+                  return (
+                    <div
+                      key={merchant.id}
+                      className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col gap-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300">
+                            {merchant.category} • {merchant.stopName}
+                          </span>
+                          <h4 className="text-sm font-bold text-white mt-1.5">
+                            {merchant.name}
+                          </h4>
+                          <p className="text-xs text-emerald-400 font-semibold">
+                            {merchant.offer}
+                          </p>
+                          <p className="text-[11px] text-zinc-500 mt-0.5">
+                            {merchant.distance}
+                          </p>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="text-sm font-extrabold text-amber-400">
+                            {merchant.pointsCost}
+                          </span>
+                          <span className="block text-[10px] text-zinc-400">
+                            puntos
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleRedeemMerchant(merchant)}
+                        disabled={!canAfford}
+                        className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                          canAfford
+                            ? 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950'
+                            : 'bg-zinc-950 text-zinc-600 border border-zinc-800 cursor-not-allowed'
+                        }`}
+                      >
+                        <QrCode className="w-4 h-4" />
+                        {canAfford
+                          ? 'Canjear Cupón QR'
+                          : `Faltan ${merchant.pointsCost - points} pts`}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* QR Coupon Modal (Passenger Only) */}
+        {redeemedMerchant && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="bg-zinc-900 border border-emerald-500/40 rounded-3xl p-6 max-w-xs w-full text-center relative">
+              <button
+                onClick={() => setRedeemedMerchant(null)}
+                className="absolute top-4 right-4 p-1.5 rounded-full bg-zinc-800 text-zinc-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-3">
+                <CheckCircle2 className="w-7 h-7" />
+              </div>
+
+              <h3 className="text-base font-extrabold text-white">
+                ¡Cupón Generado!
+              </h3>
+              <p className="text-xs text-zinc-400 mt-1">
+                Muestra este código en{' '}
+                <span className="text-white font-semibold">
+                  {redeemedMerchant.name}
+                </span>
+              </p>
+
+              <div className="my-4 bg-white p-4 rounded-2xl inline-flex flex-col items-center">
+                <QrCode className="w-32 h-32 text-zinc-950 stroke-[1.6]" />
+                <span className="mt-2 text-xs font-mono font-extrabold text-zinc-950 tracking-wider">
+                  {redeemedMerchant.code}
+                </span>
+              </div>
+
+              <p className="text-xs font-bold text-emerald-400 mb-4">
+                {redeemedMerchant.offer}
+              </p>
+
+              <button
+                onClick={() => setRedeemedMerchant(null)}
+                className="w-full py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-white"
+              >
+                Listo
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Navigation Bar (Adapts dynamically: 3 tabs for Passenger, 2 for Driver) */}
+        <nav className="fixed bottom-0 w-full max-w-md bg-zinc-950/95 backdrop-blur-md border-t border-zinc-900 px-3 py-2 z-30">
+          <div
+            className={`grid ${
+              role === 'passenger' ? 'grid-cols-3' : 'grid-cols-2'
+            } gap-1`}
+          >
+            <button
+              onClick={() => setActiveTab('map')}
+              className={`flex flex-col items-center justify-center py-1.5 rounded-xl transition-all ${
+                activeTab === 'map'
+                  ? role === 'passenger'
+                    ? 'text-emerald-400 bg-emerald-500/10'
+                    : 'text-amber-400 bg-amber-400/10'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <MapPin className="w-5 h-5" />
+              <span className="text-[10px] font-bold mt-1">Mapa en Vivo</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('route')}
+              className={`flex flex-col items-center justify-center py-1.5 rounded-xl transition-all ${
+                activeTab === 'route'
+                  ? role === 'passenger'
+                    ? 'text-emerald-400 bg-emerald-500/10'
+                    : 'text-amber-400 bg-amber-400/10'
+                  : 'text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              <Navigation className="w-5 h-5" />
+              <span className="text-[10px] font-bold mt-1">
+                {role === 'passenger' ? 'Unidades y ETA' : 'Ruta y Demanda'}
+              </span>
+            </button>
+
+            {role === 'passenger' && (
+              <button
+                onClick={() => setActiveTab('rewards')}
+                className={`flex flex-col items-center justify-center py-1.5 rounded-xl transition-all ${
+                  activeTab === 'rewards'
+                    ? 'text-amber-400 bg-amber-400/10'
+                    : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+              >
+                <Gift className="w-5 h-5" />
+                <span className="text-[10px] font-bold mt-1">Comercios</span>
+              </button>
+            )}
+          </div>
+        </nav>
+      </div>
+    </div>
+  );
+}
